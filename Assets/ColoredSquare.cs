@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum SquareColor { red, blue, green, orange, yellow, white };
 public class ColoredSquare : MonoBehaviour
 {
     public SquareColor Color;
