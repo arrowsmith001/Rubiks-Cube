@@ -3,20 +3,18 @@ using UnityEngine;
 
 public class Layer
 {
-    Transform centerPiece;
+    Transform[] orbiters = new Transform[10];
 
-    Transform[] orbiters = new Transform[9];
-
-    int orbitersAdded = 0;
+    int piecesAdded = 0;
 
     public Layer(Transform piece)
     {
-        centerPiece = piece;
+        AddOrbiter(piece);
     }
 
     public void AddOrbiter(Transform cube){
-        orbiters[orbitersAdded] = cube;
-        orbitersAdded++;
+        orbiters[piecesAdded] = cube;
+        piecesAdded++;
     }
 
     public Transform[] GetOrbiters()
@@ -25,7 +23,7 @@ public class Layer
     }
 
     public Transform GetCenter(){
-        return centerPiece;
+        return orbiters[0];
     }
 
     internal void SnapPiecesToGrid()
@@ -41,5 +39,10 @@ public class Layer
             piece.rotation = Quaternion.Euler(newEuler.x, newEuler.y, newEuler.z);
 
         }
+    }
+
+    public object GetPieceCount()
+    {
+        return piecesAdded + 1;
     }
 }

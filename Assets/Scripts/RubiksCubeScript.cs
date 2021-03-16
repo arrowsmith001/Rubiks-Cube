@@ -37,19 +37,35 @@ public class RubiksCubeScript : MonoBehaviour
     Dictionary<Transform, Layer> centersToLayersMap = new Dictionary<Transform, Layer>();
 
 
+    // FIELDS
+    public float cameraRotateSpeed = 10;
+    public float cubeRotationSpeed = 10;
+    public float layerTurnSpeed = 5;
 
-    bool isRotating = false;
+
+    // RESOURCES
+    Material faceHighlightBlue;
+    Material faceHighlightOrange;
+
+
+    bool isCubeRotating = false;
     Quaternion targetRotation = Quaternion.identity;
 
 
     // Start is called before the first frame update
     void Start()
     {
+        AddMaterials();
+
         AddPositions();
 
         AddCenterPieces();
     }
 
+    void AddMaterials(){
+        faceHighlightBlue = Resources.Load<Material>("Materials/FaceHighlightBlue");
+        faceHighlightOrange = Resources.Load<Material>("Materials/FaceHighlightOrange");
+    }
     void AddPositions(){
         foreach(Transform position in positionsRoot.transform){
             positionMap.Add(position.gameObject.name, position.position);
@@ -65,26 +81,49 @@ public class RubiksCubeScript : MonoBehaviour
     }
 
 
+    Transform frontFace;
+    Transform selectedFace;
+    bool mustUpdate = false;
     
     // Update is called once per frame
     void Update()
     {
-        AssignFaces();
 
-        AssignPieces();
+        // Check that front face is still the same, otherwise update all existing information
+        RaycastHit hit;    
+        if(Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit))
+        {
+            if(hit.collider.gameObject != frontFace){
 
-        AddLayers();
+                frontFace = hit.collider.gameObject.transform;
+                mustUpdate = true;
+            }
+        }
+
+        if(mustUpdate && !isTurning){
+            
+            AssignFaces();
+
+            AssignPieces();
+
+            AddLayers(); 
+            
+            int i = 0;
+            foreach(var layer in centersToLayersMap.Values){
+                Debug.Log(i + " : " + layer.GetPieceCount());
+            }
+
+            mustUpdate = false;
+        }
+
+
     }
 
     void AssignFaces(){
         faceCodeToFaceMap.Clear();
         RaycastHit hit;    
     
-        // Raycast from camera facing direction into world space, determines front face
-        if(Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit))
-        {
-            faceCodeToFaceMap.Add(RubiksFace.F, hit.collider.transform);
-        }
+        faceCodeToFaceMap.Add(RubiksFace.F, frontFace.transform);
 
         // Raycast backwards from center, determines back
         if(Physics.Raycast(positionMap["Center"] + Camera.main.transform.forward * 5, -Camera.main.transform.forward, out hit))
@@ -116,10 +155,6 @@ public class RubiksCubeScript : MonoBehaviour
         {
             faceCodeToFaceMap.Add(RubiksFace.L, hit.collider.transform);
         
-        }
-
-        foreach(Transform face in facesRoot.transform){
-            face.gameObject.GetComponent<MeshRenderer>().enabled = (face == faceCodeToFaceMap[RubiksFace.F]);
         }
     }
 
@@ -190,12 +225,6 @@ public class RubiksCubeScript : MonoBehaviour
         }
     }
 
-    Layer layer;
-    Transform face;
-    float layerTurningTarget = 90;
-    Vector3 layerTurningPoint;
-    Vector3 layerTurningAxis;
-    float progress = 0;
     bool isTurning = false;
 
     private void LateUpdate() {
@@ -206,73 +235,130 @@ public class RubiksCubeScript : MonoBehaviour
 
         //if(Input.GetKeyDown(KeyCode.Space)) FaceTurnTest();
 
-        // Test: Turn front layer CW/CCW on mouse click
-        if(Input.GetMouseButtonDown(0) && !isTurning){
-
-            face = faceCodeToFaceMap[RubiksFace.F];
-            var center = faceCentersMap[face];
-            layer = centersToLayersMap[center];
-            layerTurningPoint = layer.GetCenter().position;
-            layerTurningAxis = face.forward;
-
-            StartCoroutine(Rotate(RotationDirection.Clockwise));
-        }
-
-        if(Input.GetMouseButtonDown(1) && !isTurning){
-
-            face = faceCodeToFaceMap[RubiksFace.F];
-            var center = faceCentersMap[face];
-            layer = centersToLayersMap[center];
-            layerTurningPoint = layer.GetCenter().position;
-            layerTurningAxis = face.forward;
-
-            StartCoroutine(Rotate(RotationDirection.CounterClockwise));
-        }
-
-
+        Mouse();
         
-        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, 10*Time.deltaTime);
+        FaceHighlight();
+
+        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, cubeRotationSpeed*Time.deltaTime);
     }
 
-    Quaternion initialRotation;
-    IEnumerator Rotate(RotationDirection direction)
+    List<KeyCode> keyCodes = new List<KeyCode>(new KeyCode[] {KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D});
+    List<KeyCode> keyPressLog = new List<KeyCode>();
+
+    void FaceHighlight()
+    {
+        foreach(Transform face in facesRoot.transform){
+            face.gameObject.GetComponent<MeshRenderer>().enabled = false;
+        }
+
+        foreach(KeyCode k in keyCodes){
+            if(Input.GetKeyDown(k)){
+                if(!keyPressLog.Contains(k)){
+                    keyPressLog.Add(k);
+                }
+            }else if(Input.GetKeyUp(k)){
+                if(keyPressLog.Contains(k)){
+                    keyPressLog.Remove(k);
+                }   
+            }
+        }
+
+        if(keyPressLog.Count == 0){
+            selectedFace = frontFace;
+        }else{
+            switch(keyPressLog[keyPressLog.Count-1]){
+
+                case KeyCode.W:
+                selectedFace = faceCodeToFaceMap[RubiksFace.U];
+                break;
+
+                case KeyCode.A:
+                selectedFace = faceCodeToFaceMap[RubiksFace.L];
+                break;
+
+                case KeyCode.S:
+                selectedFace = faceCodeToFaceMap[RubiksFace.D];
+                break;
+
+                case KeyCode.D:
+                selectedFace = faceCodeToFaceMap[RubiksFace.R];
+                break;
+            }
+        }
+
+        frontFace.gameObject.GetComponent<MeshRenderer>().enabled = true;
+        frontFace.gameObject.GetComponent<MeshRenderer>().sharedMaterial = faceHighlightBlue;
+        Debug.Log(frontFace.name);
+
+        if(selectedFace != frontFace){
+            selectedFace.gameObject.GetComponent<MeshRenderer>().enabled = true;
+            selectedFace.gameObject.GetComponent<MeshRenderer>().sharedMaterial = faceHighlightOrange;
+        }
+
+
+    }
+
+    void Mouse(){
+        
+        if(isTurning) return;
+
+        // Test: Turn front layer CW/CCW on mouse click
+        if(Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)){
+
+
+            var face = selectedFace;
+            var center = faceCentersMap[face];
+            var layer = centersToLayersMap[center];
+            var layerTurningPoint = layer.GetCenter().position;
+            var layerTurningAxis = face.forward;
+
+            var direction =  Input.GetMouseButtonDown(0) ? RotationDirection.Clockwise : RotationDirection.CounterClockwise;
+
+            LayerTurnData turnData = new LayerTurnData(direction, layer, layerTurningPoint, layerTurningAxis, face);
+
+            StartCoroutine(Rotate(turnData));
+        }
+    }
+
+    Interpolator layerTurnInterpolator = new AccelerateDecelerateInterpolator();
+    IEnumerator Rotate(LayerTurnData data)
     {   
         isTurning = true;
-        progress = 0;
+        float progress = 0;
 
         // Find temporary game object
         Transform temp = cubesRoot.transform.Find("Temp");
 
         // Figure out target rotation
-        temp.position = layerTurningPoint;
-        temp.rotation = face.rotation;
-        temp.RotateAround(layerTurningPoint, layerTurningAxis, 
-            direction == RotationDirection.Clockwise ? 90 : -90);
+        temp.position = data.layerTurningPoint;
+        temp.rotation = data.face.rotation;
+        temp.RotateAround(data.layerTurningPoint, data.layerTurningAxis, 
+            data.direction == RotationDirection.Clockwise ? 90 : -90);
             
         Quaternion targetRot = temp.rotation;
 
         // Now use temp
-        temp.position = layerTurningPoint;
-        temp.rotation = face.rotation;
-        initialRotation = temp.rotation;
+        temp.position = data.layerTurningPoint;
+        temp.rotation = data.face.rotation;
 
-        foreach(var piece in layer.GetOrbiters())
+        Quaternion initialRotation = temp.rotation;
+
+        foreach(var piece in data.layer.GetOrbiters())
         {
             piece.SetParent(temp);
         }
 
-
-   
-
         while(progress < 1)
         {
-            progress += Time.deltaTime;
-            temp.rotation = Quaternion.Lerp(initialRotation, targetRot, progress);
+            temp.rotation = Quaternion.Lerp(initialRotation, targetRot, layerTurnInterpolator.getValue(progress));
+            progress += layerTurnSpeed*Time.deltaTime;
             yield return null;
         }
 
+        temp.rotation = targetRot;
 
-        foreach(var piece in layer.GetOrbiters())
+
+        foreach(var piece in data.layer.GetOrbiters())
         {
             piece.SetParent(cubesRoot.transform);
         }
@@ -281,26 +367,6 @@ public class RubiksCubeScript : MonoBehaviour
 
         progress = 0;
         isTurning = false;
-
-    }
-
-    void FaceTurnTest(){
-        int i = 0;
-        GameObject center = null;
-        List<GameObject> cubes = new List<GameObject>();
-        foreach(Transform cube in cubesRoot.transform){
-            if(i < 9){
-                if(i == 0) center = cube.gameObject;
-                cubes.Add(cube.gameObject);
-            }
-            i++;
-        }
-
-        foreach(GameObject cube in cubes){
-            cube.transform.RotateAround(
-                center.transform.position, Vector3.up, 90
-            );
-        }
 
     }
 
@@ -328,17 +394,16 @@ public class RubiksCubeScript : MonoBehaviour
 
     void RotateCamera()
     {
-        float speed = 10;
 
             if(Input.GetKey(KeyCode.Space))
             {
                 Camera.main.transform.RotateAround(transform.position, 
                                                 Vector3.up,
-                                                Input.GetAxis("Mouse X")*speed);
+                                                Input.GetAxis("Mouse X")*cameraRotateSpeed);
 
                 Camera.main.transform.RotateAround(transform.position, 
                                                 Camera.main.transform.right,
-                                                -Input.GetAxis("Mouse Y")*speed);
+                                                -Input.GetAxis("Mouse Y")*cameraRotateSpeed);
             } 
             else{
 

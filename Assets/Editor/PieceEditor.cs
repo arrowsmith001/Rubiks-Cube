@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(Piece))]
-[CanEditMultipleObjects]
+[CanEditMultipleObjects] // This script kind of doesn't work for multiple objects... TODO Fix this
 public class PieceEditor : Editor
 {
     SerializedProperty frontColor;

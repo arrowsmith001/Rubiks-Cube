@@ -1,0 +1,1 @@
+WASD selecting faces quickly and then turning a layer can destroy the cube
