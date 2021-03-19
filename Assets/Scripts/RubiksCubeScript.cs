@@ -16,6 +16,8 @@ public class RubiksCubeScript : MonoBehaviour
     public GameObject facesRoot;
     public GameObject positionsRoot;
 
+    public GameObject labels;
+
     // ONE TIME
 
     // Lookup for key positions (facing outward on Z)
@@ -23,6 +25,7 @@ public class RubiksCubeScript : MonoBehaviour
 
     // Name lookup for center pieces
     Dictionary<String, Transform> centerCubesMap = new Dictionary<String, Transform>();
+    Dictionary<Transform, LabelScript> labelsMap = new Dictionary<Transform, LabelScript>();
 
 
     // NEED TO BE REPEATED
@@ -40,7 +43,7 @@ public class RubiksCubeScript : MonoBehaviour
     // FIELDS
     public float cameraRotateSpeed = 10;
     public float cubeRotationSpeed = 10;
-    public float layerTurnSpeed = 5;
+    public float layerTurnSpeed = 10;
 
 
     // RESOURCES
@@ -60,6 +63,18 @@ public class RubiksCubeScript : MonoBehaviour
         AddPositions();
 
         AddCenterPieces();
+
+        AssignLabels();
+    }
+
+    private void AssignLabels()
+    {
+        foreach(Transform t in facesRoot.transform){
+            LabelScript ls = labels.transform.Find(t.name).GetComponent<LabelScript>();
+            ls.SetTransform(t);
+            labelsMap.Add(t, ls);
+            Debug.Log("Added " + t.name + " to " + ls.gameObject.transform.name);
+        }
     }
 
     void AddMaterials(){
@@ -88,7 +103,6 @@ public class RubiksCubeScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
         // Check that front face is still the same, otherwise update all existing information
         RaycastHit hit;    
         if(Physics.Raycast(Camera.main.transform.position, Camera.main.transform.forward, out hit))
@@ -110,13 +124,29 @@ public class RubiksCubeScript : MonoBehaviour
             
             int i = 0;
             foreach(var layer in centersToLayersMap.Values){
-                Debug.Log(i + " : " + layer.GetPieceCount());
+                //Debug.Log(i + " : " + layer.GetPieceCount());
             }
 
             mustUpdate = false;
         }
 
+        FaceHighlight();
 
+
+    }
+
+    
+    private void LateUpdate() {
+
+        RotateCamera();
+
+        ArrowKeys();
+
+        //if(Input.GetKeyDown(KeyCode.Space)) FaceTurnTest();
+
+        Mouse();
+
+        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, cubeRotationSpeed*Time.deltaTime);
     }
 
     void AssignFaces(){
@@ -124,36 +154,56 @@ public class RubiksCubeScript : MonoBehaviour
         RaycastHit hit;    
     
         faceCodeToFaceMap.Add(RubiksFace.F, frontFace.transform);
+        labelsMap[frontFace].SetText(RubiksFace.F.ToString());
 
         // Raycast backwards from center, determines back
         if(Physics.Raycast(positionMap["Center"] + Camera.main.transform.forward * 5, -Camera.main.transform.forward, out hit))
         {
-            faceCodeToFaceMap.Add(RubiksFace.B, hit.collider.transform);
+            RubiksFace thisFaceCode = RubiksFace.B;
+            Transform thisFace = hit.collider.transform;
+
+            faceCodeToFaceMap.Add(thisFaceCode, thisFace);
+            labelsMap[thisFace].SetText(thisFaceCode.ToString());
         }
 
         // Raycast upwards from center, determines top
         if(Physics.Raycast(positionMap["Center"] + Camera.main.transform.up * 5, -Camera.main.transform.up, out hit))
         {
-            faceCodeToFaceMap.Add(RubiksFace.U, hit.collider.transform);
-        
+            RubiksFace thisFaceCode = RubiksFace.U;
+            Transform thisFace = hit.collider.transform;
+
+            faceCodeToFaceMap.Add(thisFaceCode, thisFace);
+            labelsMap[thisFace].SetText(thisFaceCode.ToString());
         }
 
         // Raycast downwards from center, determines bottom
         if(Physics.Raycast(positionMap["Center"] - Camera.main.transform.up * 5, Camera.main.transform.up, out hit))
         {
-            faceCodeToFaceMap.Add(RubiksFace.D, hit.collider.transform);
+            RubiksFace thisFaceCode = RubiksFace.D;
+            Transform thisFace = hit.collider.transform;
+
+            faceCodeToFaceMap.Add(thisFaceCode, thisFace);
+            labelsMap[thisFace].SetText(thisFaceCode.ToString());
         
         }
         // Raycast rightwards from center, determines right
         if(Physics.Raycast(positionMap["Center"] + Camera.main.transform.right * 5, -Camera.main.transform.right, out hit))
         {
-            faceCodeToFaceMap.Add(RubiksFace.R, hit.collider.transform);
+            RubiksFace thisFaceCode = RubiksFace.R;
+            Transform thisFace = hit.collider.transform;
+
+            faceCodeToFaceMap.Add(thisFaceCode, thisFace);
+            labelsMap[thisFace].SetText(thisFaceCode.ToString());
         
         }
         // Raycast leftwards from center, determines left
         if(Physics.Raycast(positionMap["Center"] - Camera.main.transform.right * 5, Camera.main.transform.right, out hit))
         {
-            faceCodeToFaceMap.Add(RubiksFace.L, hit.collider.transform);
+            RubiksFace thisFaceCode = RubiksFace.L;
+            Transform thisFace = hit.collider.transform;
+
+            faceCodeToFaceMap.Add(thisFaceCode, thisFace);
+            labelsMap[thisFace].SetText(thisFaceCode.ToString());
         
         }
     }
@@ -227,20 +277,6 @@ public class RubiksCubeScript : MonoBehaviour
 
     bool isTurning = false;
 
-    private void LateUpdate() {
-
-        RotateCamera();
-
-        ArrowKeys();
-
-        //if(Input.GetKeyDown(KeyCode.Space)) FaceTurnTest();
-
-        Mouse();
-        
-        FaceHighlight();
-
-        transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, cubeRotationSpeed*Time.deltaTime);
-    }
 
     List<KeyCode> keyCodes = new List<KeyCode>(new KeyCode[] {KeyCode.W, KeyCode.A, KeyCode.S, KeyCode.D});
     List<KeyCode> keyPressLog = new List<KeyCode>();
@@ -288,7 +324,6 @@ public class RubiksCubeScript : MonoBehaviour
 
         frontFace.gameObject.GetComponent<MeshRenderer>().enabled = true;
         frontFace.gameObject.GetComponent<MeshRenderer>().sharedMaterial = faceHighlightBlue;
-        Debug.Log(frontFace.name);
 
         if(selectedFace != frontFace){
             selectedFace.gameObject.GetComponent<MeshRenderer>().enabled = true;
@@ -300,7 +335,7 @@ public class RubiksCubeScript : MonoBehaviour
 
     void Mouse(){
         
-        if(isTurning) return;
+        if(mustUpdate || isTurning) return;
 
         // Test: Turn front layer CW/CCW on mouse click
         if(Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)){
